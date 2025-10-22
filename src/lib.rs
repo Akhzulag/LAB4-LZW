@@ -43,8 +43,7 @@ impl BitStream {
         }
     }
 
-
-    fn new(file_name: &str, mode: Mode) -> Self {
+    pub fn new(file_name: &str, mode: Mode) -> Self {
         match mode {
             Mode::Read => {
                 let file = OpenOptions::new()
@@ -189,7 +188,7 @@ impl BitStream {
                 }
             }
         }
-        
+
         Ok(seq)
     }
 
@@ -259,7 +258,7 @@ impl BitStream {
             self.buffer.truncate(self.index_buf + 1)
         }
 
-    // println!("buffer {:?}", self.buffer);
+        // println!("buffer {:?}", self.buffer);
         self.file.write_all(&self.buffer)?;
         self.buffer = vec![0; BUFFER_SIZE];
         self.point_bit = 0;
