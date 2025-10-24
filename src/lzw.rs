@@ -1,13 +1,9 @@
-#![allow(dead_code, unused)]
+#![allow(dead_code, unused, non_snake_case)]
 use LZW::BitStream;
 use LZW::Mode;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader, Read, Result};
-
-pub fn decode(file_read: &str, file_write: &str) -> Result<()> {
-    Ok(())
-}
+use std::io::{BufReader, BufWriter, Read, Result, Write};
 
 pub fn encode(file_read: &str, file_write: &str) -> Result<()> {
     let mut reader = BufReader::new(File::open(file_read)?);
@@ -24,15 +20,80 @@ pub fn encode(file_read: &str, file_write: &str) -> Result<()> {
     let mut I: Option<u32> = None;
     let mut size = dict.len() as u32 - 1;
     while reader.read_exact(&mut c).is_ok() {
-        if let Some(&index) = dict.get(&(c[0], I)) {
+        let c = c[0];
+        if let Some(&index) = dict.get(&(c, I)) {
             I = Some(index);
         } else {
             ds.write_bit_sequence(&I.unwrap().to_le_bytes(), 4);
             size += 1;
-            dict.insert((c[0], I), size);
+            dict.insert((c, I), size);
+            I = Some(c as u32);
         }
     }
     ds.write_bit_sequence(&I.unwrap().to_le_bytes(), 4);
+
+    Ok(())
+}
+
+fn from_le_bytes_to_u32(seq: &[u8]) -> u32 {
+    seq.iter()
+        .enumerate()
+        .fold(0u32, |acc, (i, &x)| acc | ((x as u32) << (8 * i)))
+}
+
+fn get_word(S: &(u8, Option<usize>), dict: &[(u8, Option<usize>)]) -> Vec<u8> {
+    let mut out_S: Vec<u8> = Vec::new();
+    let mut S = S;
+    while let Some(i) = S.1 {
+        out_S.push(S.0);
+        S = &dict[i];
+    }
+    out_S.push(S.0);
+    out_S.reverse();
+
+    out_S
+}
+
+pub fn decode(file_read: &str, file_write: &str) -> Result<()> {
+    let mut writer = BufWriter::new(File::open(file_write)?);
+
+    // TODO: add reading capacity of dictionary
+    let mut dict: Vec<(u8, Option<usize>)> = Vec::with_capacity(256);
+
+    for i in 0..255 {
+        dict.push((i, None));
+    }
+
+    let read_bits = 8;
+    let mut ds = BitStream::new(file_read, Mode::Read);
+    let mut I = from_le_bytes_to_u32(&ds.read_bit_sequence(read_bits)?) as usize;
+
+    let mut S = dict[I];
+    writer.write_all(&[S.0]); // write S into 
+
+    let (mut old_I, mut old_S) = (I, vec![S.0]);
+    let mut size = dict.len() - 1;
+
+    while let Ok(seq) = ds.read_bit_sequence(read_bits) {
+        I = from_le_bytes_to_u32(&seq) as usize;
+        if I <= size {
+            S = dict[I];
+
+            old_S = get_word(&S, &dict);
+
+            writer.write_all(&old_S);
+
+            dict.push((old_S[0], Some(old_I)));
+            size += 1;
+
+            old_I = I;
+        } else {
+            old_S.push(old_S[0]);
+            writer.write_all(&old_S);
+            dict.push((old_S[0], Some(I)));
+            old_I = I;
+        }
+    }
 
     Ok(())
 }
