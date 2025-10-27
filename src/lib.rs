@@ -9,7 +9,7 @@ pub enum Mode {
 }
 
 // const BUFFER_SIZE: usize = 1;
-const BUFFER_SIZE: usize = 8 * 1024;
+const BUFFER_SIZE: usize = 1024 * 1024;
 
 pub struct BitStream {
     file: File,
@@ -176,7 +176,7 @@ impl BitStream {
 
                         if copy != 0 {
                             seq[i] |= (self.buffer[self.index_buf]
-                                & (0xff >> (8 - self.index_buf)))
+                                & (0xff >> (8 - self.point_bit)))
                                 << (8 - copy);
                         }
                     } else {
